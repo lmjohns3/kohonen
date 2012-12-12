@@ -1,23 +1,24 @@
+import os
 import setuptools
 
 setuptools.setup(
     name='lmj.kohonen',
-    version='1.1.1',
-    install_requires=['numpy'],
+    version='1.1.2',
     namespace_packages=['lmj'],
-    py_modules=['lmj.kohonen'],
+    packages=setuptools.find_packages(),
     author='Leif Johnson',
     author_email='leif@leifjohnson.net',
-    description='A small library of Kohonen-style vector quantizers.',
-    long_description=open('README.rst').read(),
+    description='A library of vector quantizers',
+    long_description=open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'README.md')).read(),
     license='MIT',
+    url='http://github.com/lmjohns3/py-kohonen',
     keywords=('kohonen '
               'self-organizing-map '
               'neural-gas '
               'growing-neural-gas '
               'vector-quantization '
               'machine-learning'),
-    url='http://github.com/lmjohns3/py-kohonen',
+    install_requires=['numpy'],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Science/Research',

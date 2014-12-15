@@ -8,7 +8,7 @@ setuptools.setup(
     author='Leif Johnson',
     author_email='leif@leifjohnson.net',
     description='A library of vector quantizers',
-    long_description=open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'README.md')).read(),
+    long_description=open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'README.rst')).read(),
     license='MIT',
     url='http://github.com/lmjohns3/py-kohonen',
     keywords=('kohonen '

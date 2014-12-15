@@ -20,7 +20,7 @@
 
 '''Basic self-organizing map implementation.
 
-This module contains the following Kohonen map implementations :
+This module contains the following Kohonen map implementations:
 
   - Map. A standard rectangular N-dimensional Kohonen map.
 
@@ -40,7 +40,7 @@ Because they have a grid topology, Map objects have some cool visualization
 options, including Map.neuron_colormap and Map.distance_heatmap. These require
 the Python Image Library.
 
-There is also a collection of distance metrics :
+There is also a collection of distance metrics:
 
   - cosine_metric. A callable that calculates the cosine distance between a cue
     and each neuron in a Kohonen Map.
@@ -51,7 +51,7 @@ There is also a collection of distance metrics :
   - manhattan_metric. A callable that calculates the Manhattan distance between
     a cue and each neuron in a Kohonen Map.
 
-There are also some small utility classes for modeling time series values :
+There are also some small utility classes for modeling time series values:
 
   - Timeseries. A callable that takes no arguments and returns a value that
     might vary over time. Each call to the function will generally return a
@@ -342,7 +342,7 @@ class Map(object):
     usage, cues represent some data point of interest. Normally applications of
     Maps use input vectors like the activation patterns for an array of sensors,
     term frequency vectors for a document, etc. Cues are stored in the Map as
-    follows : First, a "winner" neuron w is chosen from the Map, and, second,
+    follows: First, a "winner" neuron w is chosen from the Map, and, second,
     the neurons in the Map topologically near w are altered so that they become
     closer to the cue. Each of these steps is described briefly below.
 
@@ -446,7 +446,7 @@ class Map(object):
     def winner(self, cue):
         '''Get the coordinates of the most similar neuron to the given cue.
 
-        Returns a flat index ; use flat_to_coords to convert this to a neuron
+        Returns a flat index; use flat_to_coords to convert this to a neuron
         index.
         '''
         return self.smallest(self.distances(cue))
@@ -454,7 +454,7 @@ class Map(object):
     def sample(self, n):
         '''Get a sample of n neuron coordinates from the map.
 
-        The returned values will be flat indices ; use flat_to_coords to convert
+        The returned values will be flat indices; use flat_to_coords to convert
         them to neuron indices.
         '''
         return rng.randint(0, self.neurons.size / self.dimension - 1, n)
@@ -462,7 +462,7 @@ class Map(object):
     def smallest(self, distances):
         '''Get the index of the smallest element in the given distances array.
 
-        Returns a flat index ; use flat_to_coords to convert this to a neuron
+        Returns a flat index; use flat_to_coords to convert this to a neuron
         index.
         '''
         assert distances.shape == self.shape

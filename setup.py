@@ -2,9 +2,8 @@ import os
 import setuptools
 
 setuptools.setup(
-    name='lmj.kohonen',
+    name='kohonen',
     version='1.1.2',
-    namespace_packages=['lmj'],
     packages=setuptools.find_packages(),
     author='Leif Johnson',
     author_email='leif@leifjohnson.net',

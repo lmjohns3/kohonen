@@ -1,74 +1,31 @@
 #!/usr/bin/env python
 
-# Copyright (c) 2009 Leif Johnson <leif@leifjohnson.net>
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
-'''A GTK-based test for Kohonen maps.
-
-Press q to quit.
-
-Press h to change the source data to a horseshoe shape.
-Press s to change the source data to a square shape.
-Press c to change the source data to a circle shape.
-
-Press + and - to grow and shrink the source data.
-Press the arrow keys to move the location of the source data.
-
-Press space bar to toggle training.
-
-Press 1, 2, etc. to toggle display of the first, second, etc. controller's
-neurons and error bars.
-'''
-
 import cairo
-import gobject
-import gtk
-import logging
-import math
-import numpy
+import click
+import numpy as np
 import numpy.random as rng
-import optparse
-import sys
 
-import lmj.kohonen
+import gi
+gi.require_version('Gdk', '3.0')
+from gi.repository import Gdk
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk
+gi.require_version('GObject', '2.0')
+from gi.repository import GObject
 
-FLAGS = optparse.OptionParser()
-FLAGS.add_option('-v', '--verbose', action='store_true', help='Be more verbose')
-FLAGS.add_option('-z', '--scale', type=float, default=0,
-                 help='Scale the initial distribution by this factor')
-FLAGS.add_option('-x', '--x-offset', type=int, default=0,
-                 help='Start the distribution at this horizontal offset')
-FLAGS.add_option('-y', '--y-offset', type=int, default=0,
-                 help='Start the distribution at this vertical offset')
-FLAGS.add_option('-d', '--display', default='',
-                 help='Hide the display for these offsets')
-FLAGS.add_option('-s', '--source', default='square',
-                 help='Start with this source distribution')
-FLAGS.add_option('', '--smoothing', default=50, type=int,
-                 help='Smooth errors at this rate')
+import kohonen
+
+DARK_GRAY = (0.3, 0.3, 0.3)
+RED = (0.7, 0.3, 0.3)
+BLUE = (0.3, 0.3, 0.7)
+GREEN = (0.3, 0.7, 0.3)
+YELLOW = (0.7, 0.7, 0.3)
 
 
 def dot(ctx, center, color=(0, 0, 0), size=2, alpha=1.0):
     '''Draw a dot at the given location in the given color.'''
     ctx.set_source_rgba(*(color + (alpha, )))
-    ctx.arc(center[0], center[1], size, 0, 2 * math.pi)
+    ctx.arc(center[0], center[1], size, 0, 2 * np.pi)
     ctx.fill()
 
 
@@ -83,14 +40,15 @@ class Controller(object):
 
     def learn(self):
         self.target = self.source()
+        print('learning', self.target)
         self.quantizer.learn(self.target)
 
     def evaluate(self):
         return sum(self.quantizer.distances(self.source()).min()
-                   for _ in xrange(10)) / 10
+                   for _ in range(10)) / 10
 
     def draw_neurons(self, ctx, viewer):
-        for c in lmj.kohonen.itershape(self.quantizer.shape):
+        for c in np.ndindex(*self.quantizer.shape):
             size = 2
             if hasattr(self.quantizer, 'activity'):
                 size = len(self.quantizer.activity) * self.quantizer.activity[c]
@@ -100,8 +58,8 @@ class Controller(object):
         if len(self.quantizer.shape) == 2:
             ctx.set_source_rgba(*(self.color + (0.25, )))
             ctx.set_line_width(0.5)
-            for x in xrange(0, self.quantizer.shape[0]):
-                for y in xrange(0, self.quantizer.shape[1]):
+            for x in range(0, self.quantizer.shape[0]):
+                for y in range(0, self.quantizer.shape[1]):
                     if x > 0:
                         ctx.move_to(*self.quantizer.neuron((x - 1, y)))
                         ctx.line_to(*self.quantizer.neuron((x, y)))
@@ -117,7 +75,7 @@ class GrowingGasController(Controller):
 
         ctx.set_source_rgba(*(self.color + (0.25, )))
         ctx.set_line_width(0.5)
-        for a, b in zip(*numpy.where(self.quantizer._connections > -1)):
+        for a, b in zip(*np.where(self.quantizer._connections > -1)):
             if a > b:
                 ctx.move_to(*self.quantizer.neuron(a))
                 ctx.line_to(*self.quantizer.neuron(b))
@@ -125,15 +83,15 @@ class GrowingGasController(Controller):
 
 
 class Source(object):
-    c = numpy.zeros(2)
+    c = np.zeros(2)
     e = 0
 
     @property
     def s(self):
-        return 100 / (1 + numpy.exp(-self.e / 10.0))
+        return 100 / (1 + np.exp(-self.e / 10.0))
 
     def translate(self, x, y):
-        self.c += numpy.array([x, y])
+        self.c += np.array([x, y])
 
     def scale(self, e):
         self.e += e
@@ -165,62 +123,68 @@ class SquareSource(Source):
 
 class CircleSource(Source):
     def _sample(self):
-        theta = 2 * rng.random() * math.pi
-        return rng.random() * numpy.array([math.cos(theta), math.sin(theta)])
+        theta = 2 * rng.random() * np.pi
+        return rng.random() * np.array([np.cos(theta), np.sin(theta)])
 
     def _draw(self, ctx):
-        ctx.arc(0, 0, 1, 0, 2 * math.pi)
+        ctx.arc(0, 0, 1, 0, 2 * p.pi)
         ctx.fill()
 
 
 class HorseshoeSource(Source):
     def _sample(self):
-        theta = rng.random() * math.pi
+        theta = rng.random() * np.pi
         offset = 0.2
         if rng.random() < 0.3:
             theta *= -1
             offset *= -1
         r = rng.uniform(0.5, 1)
-        return r * numpy.array([math.cos(theta), math.sin(theta) + offset])
+        return r * np.array([np.cos(theta), np.sin(theta) + offset])
 
     def _draw(self, ctx):
         for y, arc1, arc2 in ((0.2, ctx.arc, ctx.arc_negative),
                               (-0.2, ctx.arc_negative, ctx.arc)):
             ctx.move_to(0.5, y)
             ctx.line_to(1, y)
-            arc1(0, y, 1, 0, math.pi)
+            arc1(0, y, 1, 0, np.pi)
             ctx.line_to(-0.5, y)
-            arc2(0, y, 0.5, math.pi, 0)
+            arc2(0, y, 0.5, np.pi, 0)
             ctx.fill()
 
 
-class Viewer(gtk.DrawingArea):
-    __gsignals__ = {'expose-event': 'override'}
+class Viewer(Gtk.DrawingArea):
+    #__gsignals__ = {'expose-event': 'override'}
 
-    def __init__(self, options, *controllers):
+    def __init__(self, *controllers,
+                 source='square',
+                 x_offset=0,
+                 y_offset=0,
+                 scale=0.0,
+                 smoothing=50,
+                 display=''):
         super(Viewer, self).__init__()
 
         self.controllers = controllers
         self.errors = [[] for _ in self.controllers]
 
-        self.smoothing = options.smoothing
+        self.smoothing = smoothing
 
         self.visible = [False] * 10
-        for offset in getattr(options, 'display', ''):
+        for offset in display:
             self.visible[int(offset)] = True
 
         self.teacher = None
         self.iteration = 0
 
-        if options.source.startswith('c'):
+        if source.startswith('c'):
             self.set_source(CircleSource())
-        elif options.source.startswith('h'):
+        elif source.startswith('h'):
             self.set_source(HorseshoeSource())
         else:
             self.set_source(SquareSource())
 
-        self.source.translate(options.x_offset, options.y_offset)
-        self.source.scale(options.scale)
+        self.source.translate(x_offset, y_offset)
+        self.source.scale(scale)
 
     def set_source(self, source):
         self.source = source
@@ -228,23 +192,23 @@ class Viewer(gtk.DrawingArea):
             c.source = source
 
     def do_keypress(self, window, event):
-        k = event.string or gtk.gdk.keyval_name(event.keyval).lower()
+        k = event.string or Gdk.keyval_name(event.keyval).lower()
 
         if not k:
             return
 
         elif k == 'q':
-            gtk.main_quit()
+            Gtk.main_quit()
 
         elif k in '0123456789':
             self.visible[int(event.string)] ^= True
 
         elif k == ' ':
             if self.teacher:
-                gobject.source_remove(self.teacher)
+                GObject.source_remove(self.teacher)
                 self.teacher = None
             else:
-                self.teacher = gobject.timeout_add(50, self.learn)
+                self.teacher = GObject.timeout_add(50, self.learn)
 
         elif k == 'r':
             self.learn()
@@ -314,6 +278,7 @@ class Viewer(gtk.DrawingArea):
         self.draw_errors(ctx)
 
     def draw_neurons(self, ctx):
+        print('drawing neurons')
         ctx.save()
         ctx.translate(0, 20)
         if self.visible[0]:
@@ -323,6 +288,7 @@ class Viewer(gtk.DrawingArea):
         ctx.restore()
 
     def draw_errors(self, ctx):
+        print('drawing errors')
         ctx.save()
         ctx.translate(-90, -90)
         ctx.set_source_rgba(0, 0, 0, 0.9)
@@ -363,66 +329,73 @@ class Viewer(gtk.DrawingArea):
         ctx.restore()
 
 
-DARK_GRAY = (0.3, 0.3, 0.3)
-RED = (0.7, 0.3, 0.3)
-BLUE = (0.3, 0.3, 0.7)
-GREEN = (0.3, 0.7, 0.3)
-YELLOW = (0.7, 0.7, 0.3)
+@click.command()
+@click.option('-z', '--scale', type=float, default=0.0, metavar='S',
+              help='Scale the initial distribution by exp^S')
+@click.option('-x', '--x-offset', type=int, default=0, metavar='X',
+              help='Start the distribution at X')
+@click.option('-y', '--y-offset', type=int, default=0, metavar='Y',
+              help='Start the distribution at Y')
+@click.option('-d', '--display', default='',
+              help='Hide the display for these offsets')
+@click.option('-s', '--source', default='square',
+              help='Start with this source distribution')
+@click.option('--smoothing', default=50, type=int, metavar='T',
+              help='Smooth errors over T examples')
+def main(scale, x_offset, y_offset, display, source, smoothing):
+    '''A GTK-based example program for Kohonen maps.
 
+    Press q to quit.
 
-if __name__ == '__main__':
-    opts, args = FLAGS.parse_args()
+    Press h to change the source data to a horseshoe shape.
+    Press s to change the source data to a square shape.
+    Press c to change the source data to a circle shape.
 
-    logging.basicConfig(stream=sys.stdout,
-                        level=opts.verbose and logging.DEBUG or logging.INFO,
-                        format='%(levelname).1s %(asctime)s %(message)s',
-                        datefmt='%Y-%m-%d %H:%M:%S')
+    Press + and - to grow and shrink the source data.
+    Press the arrow keys to move the location of the source data.
 
-    ET = lmj.kohonen.ExponentialTimeseries
+    Press space bar to toggle training.
 
-    def kwargs(shape=(8, 8), z=0.2):
-        return dict(dimension=2,
-                    shape=shape,
-                    learning_rate=ET(-5e-4, 1, 0.1),
-                    noise_variance=z)
+    Press 1, 2, etc. to toggle display of the first, second, etc.
+    controller's neurons and error bars.
+    '''
+    ET = kohonen.ExponentialTimeseries
 
-    kw = kwargs()
-    m = lmj.kohonen.Map(lmj.kohonen.Parameters(**kw))
-    m.reset()
+    kw = dict(dimension=2,
+              learning_rate=ET(-5e-4, 1, 0.1),
+              noise_variance=0.2)
 
-    kw = kwargs((64, ))
-    g = lmj.kohonen.Gas(lmj.kohonen.Parameters(**kw))
-    g.reset()
-
-    kw = kwargs((64, ))
-    kw['growth_interval'] = 7
-    kw['max_connection_age'] = 17
-    gg = lmj.kohonen.GrowingGas(lmj.kohonen.GrowingGasParameters(**kw))
+    m = kohonen.Map(shape=(8, 8), **kw); m.reset()
+    g = kohonen.Gas(shape=(8, ), **kw); g.reset()
+    gg = kohonen.GrowingGas(
+        shape=(8, ), growth_interval=7, max_connection_age=17, **kw)
     gg.reset()
+    fm = kohonen.Filter(kohonen.Map(shape=(8, 8), **kw)); fm.reset()
+    fg = kohonen.Filter(kohonen.Gas(shape=(8, ), **kw)); fg.reset()
 
-    kw = kwargs()
-    fm = lmj.kohonen.Filter(lmj.kohonen.Map(lmj.kohonen.Parameters(**kw)))
-    fm.reset()
-
-    kw = kwargs((64, ))
-    fg = lmj.kohonen.Filter(lmj.kohonen.Gas(lmj.kohonen.Parameters(**kw)))
-    fg.reset()
-
-    v = Viewer(opts,
-               Controller(m, DARK_GRAY),
+    v = Viewer(Controller(m, DARK_GRAY),
                Controller(g, RED),
                GrowingGasController(gg, BLUE),
                Controller(fm, GREEN),
                Controller(fg, YELLOW),
-               )
+               source=source,
+               x_offset=x_offset,
+               y_offset=y_offset,
+               scale=scale,
+               smoothing=smoothing,
+               display=display)
     v.show()
 
-    w = gtk.Window()
+    w = Gtk.Window()
     w.set_title('Kohonen')
     w.set_default_size(800, 600)
     w.add(v)
     w.present()
     w.connect('key-press-event', v.do_keypress)
-    w.connect('delete-event', gtk.main_quit)
+    w.connect('delete-event', Gtk.main_quit)
 
-    gtk.main()
+    Gtk.main()
+
+
+if __name__ == '__main__':
+    main()

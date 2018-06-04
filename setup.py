@@ -5,12 +5,12 @@ setuptools.setup(
     name='kohonen',
     version='1.1.2',
     packages=setuptools.find_packages(),
-    author='Leif Johnson',
-    author_email='leif@leifjohnson.net',
+    author='lmjohns3',
+    author_email='kohonen@lmjohns3.com',
     description='A library of vector quantizers',
     long_description=open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'README.rst')).read(),
     license='MIT',
-    url='http://github.com/lmjohns3/py-kohonen',
+    url='http://github.com/lmjohns3/kohonen',
     keywords=('kohonen '
               'self-organizing-map '
               'neural-gas '
